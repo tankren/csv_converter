@@ -6,7 +6,7 @@ from watchdog.events import FileSystemEventHandler
 
 
 class Watcher:
-    DIRECTORY_TO_WATCH = input(''Enter path to folder'')
+    DIRECTORY_TO_WATCH = input('Enter path to folder')
 
     def __init__(self):
         self.observer = Observer()
