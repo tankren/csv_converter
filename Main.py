@@ -17,17 +17,20 @@ class Watcher:
 
     def run(self):
         event_handler = Handler()
-        self.observer.schedule(event_handler, self.DIRECTORY_TO_WATCH, recursive=False)
-        self.observer.start()
-        print ("------------Start monitoring------------")  
         try:
-            while True:
-                time.sleep(5)
-        except:
-            self.observer.stop()
-            print("Error")
+            self.observer.schedule(event_handler, self.DIRECTORY_TO_WATCH, recursive=False)
+            self.observer.start()
+            print ("------------Start monitoring------------")  
+            try:
+                while True:
+                    time.sleep(5)
+            except:
+                self.observer.stop()
+                print("Error")
 
-        self.observer.join()
+            self.observer.join()
+        except:
+            print("Please select the folder to be monitored")
 
 
 class Handler(FileSystemEventHandler):
