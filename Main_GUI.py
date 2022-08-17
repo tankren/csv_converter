@@ -1,87 +1,62 @@
 # -*- coding: utf-8 -*-
 # author:rec3wx
  
-import time
-from watchdog.observers import Observer
-from watchdog.events import FileSystemEventHandler
 import pandas
 import os
-import tkinter as tk
 import sys
-from datetime import datetime
+import subprocess
 from PySide6.QtWidgets import *
 from PySide6.QtGui import QFont
 from PySide6.QtCore import Slot, Qt, QThread, Signal, QEvent
-import re
-import os
-from apscheduler.schedulers.background import BackgroundScheduler
 
-class Watcher:
-    DIRECTORY_TO_WATCH= ''
     
-    def __init__(self):
-        self.observer = Observer()
-
-    def run(self):
-        event_handler = Handler()
-        try:
-            self.observer.schedule(event_handler, self.DIRECTORY_TO_WATCH, recursive=False)
-            self.observer.start()
-            print ("------------Start monitoring------------")  
-            try:
-                while True:
-                    time.sleep(5)
-            except:
-                self.observer.stop()
-                print("Error")
-
-            self.observer.join()
-        except:
-            print("Please select the folder to be monitored")
-
-
-class Handler(FileSystemEventHandler):
-    @staticmethod
-    def on_any_event(event):
-        if event.is_directory:
-            return None
-
-        elif event.event_type == 'created':
-            # Take any action here when a file is first created.
-            try:
-                print ("------------New file detected------------")                
-                oldfile = event.src_path
-                print(oldfile)
-                if os.path.splitext(oldfile)[1][1:].strip().lower()== 'csv':
-                    filename = os.path.basename(oldfile)
-                    path = os.path.dirname(oldfile)
-                    newpath = f'{path}\\converted'
-                    if not os.path.exists(newpath):
-                        os.makedirs(newpath)
-                    newfile = f'{path}\\converted\\{filename}'
-                    readcsv = pandas.read_csv(oldfile, sep=';', decimal=",")                    
-                    print("------------Start converting------------")
-                    print(readcsv)
-                    readcsv.to_csv(newfile, sep=',', decimal=".", encoding='utf-8')                
-                    print("------------Conversion completed------------")
-            except Exception as e:
-                print(e)    
 
 class Worker(QThread):
     sinOut = Signal(str)
+
     def __init__(self, parent=None):
         super(Worker, self).__init__(parent)
- 
-    def run(self):
-        pass
 
+    def getdata(self, csvpath):
+        self.csvpath = csvpath
+
+    def startfile(self, newfolder):
+        try:
+            os.startfile(newfolder)
+        except:
+            subprocess.Popen(['xdg-open', newfolder])
+
+    def run(self):
+        try:
+            file_list = [f for f in os.listdir(self.csvpath) if f.endswith('.csv')]
+            if not file_list:
+                message = f'没有找到CSV文件! 执行结束!  '
+                self.sinOut.emit(message)       
+            else: 
+                newpath = f'{self.csvpath}\\converted'
+                if not os.path.exists(newpath):
+                    os.makedirs(newpath)             
+                for oldfile in file_list:
+                    message = f'开始转换{oldfile}'
+                    self.sinOut.emit(message)
+                    newfile = f'{newpath}\\{oldfile}'
+                    readcsv = pandas.read_csv(f'{self.csvpath}\\{oldfile}', sep=';', decimal=",")
+                    readcsv.to_csv(newfile, sep=',', decimal=".", encoding='utf-8')
+                    message = f'{oldfile} 转换完成!!  '
+                    self.sinOut.emit(message)
+                message = '全部转换完成, 打开转换结果文件夹'
+                self.sinOut.emit(message)
+                self.startfile(newpath)
+        except Exception as e:
+            message = f'{e}'
+            self.sinOut.emit(message)      
 
 
 class MyWidget(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.thread = Worker()
-        title = f'CSV自动转换工具 v0.1   - Made by REC3WX'
+        title = f'CSV批量转换工具 v0.2   - Made by REC3WX'
         self.setWindowTitle(title)
         pixmapi = QStyle.SP_FileDialogDetailedView
         icon = self.style().standardIcon(pixmapi)
@@ -131,15 +106,16 @@ class MyWidget(QWidget):
               
         self.setLayout(self.layout)
 
-        self.thread.sinOut.connect(self.Addmsg)  #解决重复emit
+        self.thread.sinOut.connect(self.addmsg)  #解决重复emit
 
     @Slot()
-    def Addmsg(self, message):
+    def addmsg(self, message):
         self.text_result.appendPlainText(message)
 
     def opencsvpath(self):
-            csvpath= QFileDialog.getExistingDirectory(self, "选择被监视的CSV文件夹")
-            self.line_csv.setText(csvpath)
+        desktop = os.path.join(os.path.join(os.environ['USERPROFILE']), 'Desktop')
+        csvpath= QFileDialog.getExistingDirectory(self, "选择CSV文件夹", desktop, QFileDialog.ShowDirsOnly)
+        self.line_csv.setText(csvpath)
 
     def on_systemTrayIcon_activated(self, reason):
         if reason == QSystemTrayIcon.DoubleClick:
@@ -169,17 +145,21 @@ class MyWidget(QWidget):
 
     def execute(self):
         if self.line_csv.text() == "":
-            self.msgbox('error', '请指定需要监视的文件夹!')
+            self.msgbox('error', '请指定CSV文件夹!')
         else:
-            pass
-
+            self.addmsg(f'开始执行批量转换, 目标文件夹{self.line_csv.text()}')
+            csvpath = self.line_csv.text() 
+            self.thread.getdata(csvpath)
+            self.thread.start()
 
     def msgbox(self, title, text):
         tip = QMessageBox(self)
         if title == 'error':
             tip.setIcon(QMessageBox.Critical)
-        elif title == 'DONE' :
+        elif title == 'warn':
             tip.setIcon(QMessageBox.Warning)
+        elif title == 'info':
+            tip.setIcon(QMessageBox.information)
         tip.setWindowFlag(Qt.FramelessWindowHint)
         font = QFont()
         font.setFamily("Microsoft YaHei")
