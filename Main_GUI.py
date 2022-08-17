@@ -100,7 +100,7 @@ class MyWidget(QWidget):
 
         self.layout.addWidget((self.line), 1, 0, 1, 3)
         self.layout.addWidget((self.fld_result), 2, 0)
-        self.layout.addWidget((self.text_result), 3, 0, 6, 2)
+        self.layout.addWidget((self.text_result), 3, 0, 4, 2)
         self.layout.addWidget((self.btn_reset), 5, 2)
         self.layout.addWidget((self.btn_start), 4, 2)
               
